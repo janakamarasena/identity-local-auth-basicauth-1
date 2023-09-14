@@ -35,6 +35,8 @@ import org.wso2.carbon.identity.application.authentication.framework.exception.I
 import org.wso2.carbon.identity.application.authentication.framework.exception.LogoutFailedException;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedUser;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticationFrameworkWrapper;
+import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatorData;
+import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatorParamMetadata;
 import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants;
 import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
 import org.wso2.carbon.identity.application.authenticator.basicauth.internal.BasicAuthenticatorDataHolder;
@@ -78,6 +80,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 
 import javax.servlet.http.Cookie;
@@ -226,12 +229,15 @@ public class BasicAuthenticator extends AbstractApplicationAuthenticator
             getApplicationDetails(context, diagnosticLogBuilder);
             LoggerUtils.triggerDiagnosticLogEvent(diagnosticLogBuilder);
         }
-        Map<String, String> parameterMap = getAuthenticatorConfig().getParameterMap();
+        Map<String, String> parameterMap = getAuthenticatorConfig().getParameterMap(); // TODO: Janak what happens if multioptions page
         String showAuthFailureReason = null;
         String showAuthFailureReasonOnLoginPage = null;
         String maskUserNotExistsErrorCode = null;
         String maskAdminForcedPasswordResetErrorCode = null;
         List<String> omittingErrorParams = null;
+        // set required params to request attributes
+//        setRequiredAuthParams(request);
+//        populateAuthenticatorData(request, context);
         if (parameterMap != null) {
             showAuthFailureReason = parameterMap.get(BasicAuthenticatorConstants.CONF_SHOW_AUTH_FAILURE_REASON);
             if (log.isDebugEnabled()) {
@@ -1164,5 +1170,33 @@ public class BasicAuthenticator extends AbstractApplicationAuthenticator
         FrameworkUtils.getApplicationName(context).ifPresent(applicationName ->
                 diagnosticLogBuilder.inputParam(LogConstants.InputKeys.APPLICATION_NAME,
                         applicationName));
+    }
+
+    @Override
+    public Optional<AuthenticatorData> getAuthInitiationData(AuthenticationContext context) {
+
+        AuthenticatorData authenticatorData = new AuthenticatorData();
+        authenticatorData.setName(getName());
+        authenticatorData.setDisplayName(getFriendlyName());
+        String idpName = context.getExternalIdP().getIdPName();
+        authenticatorData.setIdp(idpName);
+
+        List<AuthenticatorParamMetadata> authenticatorParamMetadataList = new ArrayList<>();
+        AuthenticatorParamMetadata usernameMetadata = new AuthenticatorParamMetadata(
+                BasicAuthenticatorConstants.USER_NAME, FrameworkConstants.AuthenticatorParamType.STRING, 0);
+        authenticatorParamMetadataList.add(usernameMetadata);
+
+        AuthenticatorParamMetadata passwordMetadata = new AuthenticatorParamMetadata(
+                BasicAuthenticatorConstants.PASSWORD, FrameworkConstants.AuthenticatorParamType.STRING, 1, true);
+        authenticatorParamMetadataList.add(passwordMetadata);
+
+        authenticatorData.setAuthParams(authenticatorParamMetadataList);
+        return Optional.of(authenticatorData);
+    }
+
+    @Override
+    public boolean isAPIBasedAuthenticationSupported() {
+
+        return true;
     }
 }
